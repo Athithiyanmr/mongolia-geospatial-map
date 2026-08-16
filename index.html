@@ -1,0 +1,2313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Geospatial Map</title>
+
+<link
+    href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
+    rel="stylesheet"
+/>
+
+<style>
+*{
+    box-sizing:border-box;
+}
+
+html,
+body{
+    margin:0;
+    padding:0;
+    width:100%;
+    height:100%;
+    font-family:Arial,sans-serif;
+}
+
+#map{
+    position:absolute;
+    inset:0;
+}
+
+/* ==========================================================
+   BASEMAP BUTTONS
+   ========================================================== */
+
+.basemap-control{
+    position:absolute;
+    top:15px;
+    right:15px;
+    z-index:30;
+    display:flex;
+    gap:4px;
+    background:white;
+    padding:4px;
+    border-radius:7px;
+    box-shadow:0 2px 8px rgba(0,0,0,.25);
+}
+
+.basemap-btn{
+    border:0;
+    background:white;
+    padding:8px 14px;
+    border-radius:5px;
+    cursor:pointer;
+    font-size:12px;
+}
+
+.basemap-btn:hover{
+    background:#eeeeee;
+}
+
+.basemap-btn.active{
+    background:#333;
+    color:white;
+}
+
+/* ==========================================================
+   LAYER PANEL
+   ========================================================== */
+
+.panel{
+    position:absolute;
+    top:15px;
+    left:15px;
+    z-index:20;
+    width:295px;
+    max-height:calc(100vh - 110px);
+    overflow-y:auto;
+    background:rgba(255,255,255,.96);
+    border-radius:8px;
+    padding:14px;
+    box-shadow:0 2px 10px rgba(0,0,0,.25);
+}
+
+.section{
+    border-top:1px solid #ddd;
+    margin-top:11px;
+    padding-top:11px;
+}
+
+.section:first-child{
+    border-top:0;
+    margin-top:0;
+    padding-top:0;
+}
+
+.section-title{
+    font-weight:bold;
+    font-size:14px;
+    margin-bottom:8px;
+}
+
+label{
+    display:block;
+    margin:7px 0;
+    font-size:13px;
+    cursor:pointer;
+}
+
+input[type="checkbox"]{
+    margin-right:7px;
+}
+
+/* ==========================================================
+   LEGENDS
+   ========================================================== */
+
+.legend{
+    display:none;
+    margin-top:9px;
+    padding:9px;
+    background:#fafafa;
+    border:1px solid #ddd;
+    border-radius:5px;
+}
+
+.legend-title{
+    font-weight:bold;
+    font-size:13px;
+    margin-bottom:7px;
+}
+
+.legend-item{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-size:12px;
+    margin:4px 0;
+}
+
+.legend-box{
+    width:16px;
+    height:16px;
+    border:1px solid #777;
+    flex-shrink:0;
+}
+
+/* ==========================================================
+   LOGOS
+   ========================================================== */
+
+.logo-panel{
+    position:absolute;
+    bottom:15px;
+    left:15px;
+    z-index:50;
+    background:rgba(255,255,255,.95);
+    padding:8px 12px;
+    border-radius:8px;
+    box-shadow:0 2px 10px rgba(0,0,0,.2);
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+.logo-panel img{
+    display:block;
+    max-height:38px;
+    max-width:130px;
+    width:auto;
+    object-fit:contain;
+}
+
+/* ==========================================================
+   MOBILE
+   ========================================================== */
+
+@media(max-width:700px){
+
+    .panel{
+        width:245px;
+        max-height:60vh;
+    }
+
+    .logo-panel img{
+        max-height:30px;
+        max-width:100px;
+    }
+
+    .basemap-control{
+        right:10px;
+    }
+
+    .basemap-btn{
+        padding:7px 9px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div id="map"></div>
+
+<!-- ========================================================
+     BASEMAP
+     ======================================================== -->
+
+<div class="basemap-control">
+
+    <button
+        id="osmBtn"
+        class="basemap-btn active"
+    >
+        🗺 OSM
+    </button>
+
+    <button
+        id="satelliteBtn"
+        class="basemap-btn"
+    >
+        🛰 Satellite
+    </button>
+
+</div>
+
+
+<!-- ========================================================
+     LAYER PANEL
+     ======================================================== -->
+
+<div class="panel">
+
+    <!-- ====================================================
+         LAND COVER & RASTER
+         ==================================================== -->
+
+    <div class="section">
+
+        <div class="section-title">
+            Land Cover & Raster
+        </div>
+
+        <label>
+            <input
+                type="checkbox"
+                id="lulcToggle"
+            >
+            Land Cover 2025
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                id="ghiToggle"
+            >
+            GHI
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                id="slopeToggle"
+            >
+            Slope
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                id="mpzToggle"
+            >
+            Management Priority Zone
+        </label>
+
+
+        <!-- LULC LEGEND -->
+
+        <div
+            id="lulcLegend"
+            class="legend"
+        >
+
+            <div class="legend-title">
+                Land Cover 2025
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#00B9F2"
+                ></span>
+                Water
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#18a558"
+                ></span>
+                Forest
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#B1D355"
+                ></span>
+                Grassland
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#f096ff"
+                ></span>
+                Dry steppe
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#424242"
+                ></span>
+                Barren
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#e73429"
+                ></span>
+                Built-up
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#f0d080"
+                ></span>
+                Cropland
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#FF8C00"
+                ></span>
+                Roads
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#f5e6b6"
+                ></span>
+                Sand
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#7bb8b8"
+                ></span>
+                Wetland
+            </div>
+
+        </div>
+
+
+        <!-- GHI LEGEND -->
+
+        <div
+            id="ghiLegend"
+            class="legend"
+        >
+
+            <div class="legend-title">
+                GHI
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#ffffcc"
+                ></span>
+                Low
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#fed976"
+                ></span>
+                Moderate
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#fd8d3c"
+                ></span>
+                High
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#e31a1c"
+                ></span>
+                Very High
+            </div>
+
+        </div>
+
+
+        <!-- SLOPE LEGEND -->
+
+        <div
+            id="slopeLegend"
+            class="legend"
+        >
+
+            <div class="legend-title">
+                Slope (degrees)
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#4D4D4D"
+                ></span>
+                0–5°
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#707070"
+                ></span>
+                5–10°
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#969696"
+                ></span>
+                10–20°
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#BDBDBD"
+                ></span>
+                20–30°
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#D9D9D9"
+                ></span>
+                30–45°
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#FFFFFF"
+                ></span>
+                >45°
+            </div>
+
+        </div>
+
+
+        <!-- MANAGEMENT PRIORITY ZONE -->
+
+        <div
+            id="mpzLegend"
+            class="legend"
+        >
+
+            <div class="legend-title">
+                Management Priority Zone
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#2c2c2c"
+                ></span>
+                No data (severely)
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#cc0000"
+                ></span>
+                Severely degraded
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#ff6600"
+                ></span>
+                Critical
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#ffcc00"
+                ></span>
+                Recovery
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#ffff66"
+                ></span>
+                At risk
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#66cc66"
+                ></span>
+                Stable
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#3399ff"
+                ></span>
+                Improving
+            </div>
+
+            <div class="legend-item">
+                <span
+                    class="legend-box"
+                    style="background:#0033cc"
+                ></span>
+                Strong recovery
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ====================================================
+         SOLAR
+         ==================================================== -->
+
+    <div class="section">
+
+        <div class="section-title">
+            Solar
+        </div>
+
+        <label>
+            <input
+                type="checkbox"
+                id="solarTheoretical"
+            >
+            Solar Theoretical
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                id="solarTechnical"
+            >
+            Solar Technical
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                id="solarMPZ2"
+            >
+            Solar High MPZ2
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                id="solarMPZ4"
+            >
+            Solar High MPZ4
+        </label>
+
+    </div>
+
+
+    <!-- ====================================================
+         WATER
+         ==================================================== -->
+
+    <div class="section">
+
+        <div class="section-title">
+            Water
+        </div>
+
+        <label>
+            <input
+                type="checkbox"
+                id="waterTheoretical"
+            >
+            Water Theoretical
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                id="waterTechnical"
+            >
+            Water Technical
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                id="waterMPZ2"
+            >
+            Water High MPZ2
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                id="waterMPZ4"
+            >
+            Water High MPZ4
+        </label>
+
+    </div>
+
+
+    <!-- ====================================================
+         BGN
+         ==================================================== -->
+
+    <div class="section">
+
+        <div class="section-title">
+            BGN
+        </div>
+
+        <label>
+            <input
+                type="checkbox"
+                id="bgnTechnical"
+            >
+            BGN Technical
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                id="bgnMPZ2"
+            >
+            BGN High MPZ2
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                id="bgnMPZ4"
+            >
+            BGN High MPZ4
+        </label>
+
+    </div>
+
+
+    <!-- ====================================================
+         INFRASTRUCTURE
+         ==================================================== -->
+
+    <div class="section">
+
+        <div class="section-title">
+            Infrastructure
+        </div>
+
+        <label>
+            <input
+                type="checkbox"
+                id="roadsToggle"
+            >
+            Roads
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                id="railwayToggle"
+            >
+            Railway
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                id="airportToggle"
+            >
+            Airports
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                id="powerlineToggle"
+            >
+            Powerlines
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                id="substationsToggle"
+            >
+            Substations
+        </label>
+
+        <label>
+            <input
+                type="checkbox"
+                id="protectedToggle"
+            >
+            Protected Areas
+        </label>
+
+    </div>
+
+</div>
+
+
+<!-- ========================================================
+     LOGOS
+     ======================================================== -->
+
+<div class="logo-panel">
+
+    <img
+        src="http://142.132.165.186/assets/logos/avc.png"
+        alt="Auroville Consulting"
+    >
+
+    <img
+        src="http://142.132.165.186/assets/logos/HeiGIT_Logo_base.png"
+        alt="HeiGIT"
+    >
+
+</div>
+
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+
+<script>
+
+/* ==========================================================
+   SERVER
+   ========================================================== */
+
+const SERVER =
+    "http://142.132.165.186";
+
+const MARTIN =
+    "http://142.132.165.186:3000";
+
+
+/* ==========================================================
+   AOI
+   ========================================================== */
+
+const AOI_BOUNDS = [
+    [104.03459553,46.38535281],
+    [109.0561364,49.15546681]
+];
+
+
+/* ==========================================================
+   MAP
+   ========================================================== */
+
+const map =
+    new maplibregl.Map({
+
+        container:"map",
+
+        style:{
+
+            version:8,
+
+            sources:{
+
+                osm:{
+                    type:"raster",
+                    tiles:[
+                        "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    ],
+                    tileSize:256
+                },
+
+                satellite:{
+                    type:"raster",
+                    tiles:[
+                        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                    ],
+                    tileSize:256
+                },
+
+                lulc:{
+                    type:"raster",
+                    tiles:[
+                        SERVER +
+                        "/tiles/lulc/{z}/{x}/{y}.png"
+                    ],
+                    tileSize:256,
+                    minzoom:6,
+                    maxzoom:12
+                },
+
+                ghi:{
+                    type:"raster",
+                    tiles:[
+                        SERVER +
+                        "/tiles/ghi/{z}/{x}/{y}.png"
+                    ],
+                    tileSize:256,
+                    minzoom:6,
+                    maxzoom:12
+                },
+
+                slope:{
+                    type:"raster",
+                    tiles:[
+                        SERVER +
+                        "/tiles/slope/{z}/{x}/{y}.png"
+                    ],
+                    tileSize:256,
+                    minzoom:6,
+                    maxzoom:12
+                },
+
+                mpz:{
+                    type:"raster",
+                    tiles:[
+                        SERVER +
+                        "/tiles/mpz/{z}/{x}/{y}.png"
+                    ],
+                    tileSize:256,
+                    minzoom:6,
+                    maxzoom:12
+                }
+            },
+
+            layers:[
+
+                {
+                    id:"osm",
+                    type:"raster",
+                    source:"osm"
+                },
+
+                {
+                    id:"satellite",
+                    type:"raster",
+                    source:"satellite",
+                    layout:{
+                        visibility:"none"
+                    }
+                },
+
+                {
+                    id:"lulc",
+                    type:"raster",
+                    source:"lulc",
+                    layout:{
+                        visibility:"none"
+                    },
+                    paint:{
+                        "raster-opacity":0.75
+                    }
+                },
+
+                {
+                    id:"ghi",
+                    type:"raster",
+                    source:"ghi",
+                    layout:{
+                        visibility:"none"
+                    },
+                    paint:{
+                        "raster-opacity":0.65
+                    }
+                },
+
+                {
+                    id:"slope",
+                    type:"raster",
+                    source:"slope",
+                    layout:{
+                        visibility:"none"
+                    },
+                    paint:{
+                        "raster-opacity":0.75,
+                        "raster-resampling":"nearest"
+                    }
+                },
+
+                {
+                    id:"mpz",
+                    type:"raster",
+                    source:"mpz",
+                    layout:{
+                        visibility:"none"
+                    },
+                    paint:{
+                        "raster-opacity":0.75
+                    }
+                }
+
+            ]
+        },
+
+        center:[
+            106.743164,
+            47.960494
+        ],
+
+        zoom:8
+
+    });
+
+
+map.addControl(
+    new maplibregl.NavigationControl(),
+    "top-right"
+);
+
+map.addControl(
+    new maplibregl.ScaleControl(),
+    "bottom-right"
+);
+
+map.fitBounds(
+    AOI_BOUNDS,
+    {
+        padding:50,
+        duration:0
+    }
+);
+
+
+/* ==========================================================
+   MAP LOAD
+   ========================================================== */
+
+map.on(
+    "load",
+    ()=>{
+
+        addAOI();
+
+        addMartinLayer(
+            "solar_theoretical",
+            "#5a3228",
+            0.45,
+            "solar_theoretical",
+            12
+        );
+
+        addMartinLayer(
+            "solar_technical",
+            "#A77145",
+            0.45,
+            "solar_technical",
+            12
+        );
+
+        addMartinLayer(
+            "solar_high_mpz2",
+            "#d94801",
+            0.45,
+            "solar_high_mpz2",
+            12
+        );
+
+        addMartinLayer(
+            "solar_high_mpz4",
+            "#f59e0b",
+            0.45,
+            "solar_high_mpz4",
+            12
+        );
+
+        addMartinLayer(
+            "water_theoretical",
+            "#185fbb",
+            0.45,
+            "water_theoretical",
+            10
+        );
+
+        addMartinLayer(
+            "water_technical",
+            "#95daff",
+            0.45,
+            "water_technical",
+            10
+        );
+
+        addMartinLayer(
+            "water_high_mpz2",
+            "#d94801",
+            0.45,
+            "water_high_mpz2",
+            10
+        );
+
+        addMartinLayer(
+            "water_high_mpz4",
+            "#f59e0b",
+            0.45,
+            "water_high_mpz4",
+            10
+        );
+
+        addMartinLayer(
+            "bgn_technical",
+            "#99cc66",
+            0.45,
+            "bgn_technical",
+            12
+        );
+
+        addMartinLayer(
+            "bgn_high_mpz2",
+            "#d94801",
+            0.45,
+            "bgn_high_mpz2",
+            12
+        );
+
+        addMartinLayer(
+            "bgn_high_mpz4",
+            "#f59e0b",
+            0.45,
+            "bgn_high_mpz4",
+            12
+        );
+
+    }
+);
+
+
+/* ==========================================================
+   AOI
+   ========================================================== */
+
+function addAOI(){
+
+    map.addSource(
+        "aoi",
+        {
+            type:"geojson",
+            data:
+                SERVER +
+                "/aoi/aoi.geojson"
+        }
+    );
+
+    map.addLayer({
+        id:"aoi-fill",
+        type:"fill",
+        source:"aoi",
+        paint:{
+            "fill-color":"#ffffff",
+            "fill-opacity":0
+        }
+    });
+
+    map.addLayer({
+        id:"aoi-line",
+        type:"line",
+        source:"aoi",
+        paint:{
+            "line-color":"#111111",
+            "line-width":2
+        }
+    });
+
+}
+
+
+/* ==========================================================
+   MARTIN VECTOR LAYERS
+   ========================================================== */
+
+function addMartinLayer(
+    id,
+    color,
+    opacity,
+    sourceLayer,
+    maxzoom
+){
+
+    map.addSource(
+        id,
+        {
+            type:"vector",
+
+            tiles:[
+                MARTIN +
+                "/" +
+                id +
+                "/{z}/{x}/{y}"
+            ],
+
+            minzoom:6,
+            maxzoom:maxzoom
+        }
+    );
+
+    map.addLayer({
+
+        id:
+            id +
+            "-fill",
+
+        type:"fill",
+
+        source:id,
+
+        "source-layer":
+            sourceLayer,
+
+        layout:{
+            visibility:"none"
+        },
+
+        paint:{
+            "fill-color":color,
+            "fill-opacity":opacity,
+            "fill-outline-color":color
+        }
+
+    });
+
+    map.addLayer({
+
+        id:
+            id +
+            "-line",
+
+        type:"line",
+
+        source:id,
+
+        "source-layer":
+            sourceLayer,
+
+        layout:{
+            visibility:"none"
+        },
+
+        paint:{
+            "line-color":color,
+            "line-width":1
+        }
+
+    });
+
+}
+
+
+/* ==========================================================
+   VECTOR VISIBILITY
+   ========================================================== */
+
+function setVectorVisibility(
+    id,
+    visible
+){
+
+    const visibility =
+        visible
+        ? "visible"
+        : "none";
+
+    if(
+        map.getLayer(
+            id +
+            "-fill"
+        )
+    ){
+
+        map.setLayoutProperty(
+            id +
+            "-fill",
+            "visibility",
+            visibility
+        );
+
+    }
+
+    if(
+        map.getLayer(
+            id +
+            "-line"
+        )
+    ){
+
+        map.setLayoutProperty(
+            id +
+            "-line",
+            "visibility",
+            visibility
+        );
+
+    }
+
+}
+
+
+/* ==========================================================
+   RASTER TOGGLES
+   ========================================================== */
+
+function setupRasterToggle(
+    controlId,
+    layerId,
+    legendId
+){
+
+    document
+        .getElementById(controlId)
+        .addEventListener(
+            "change",
+            event=>{
+
+                const visible =
+                    event.target.checked;
+
+                map.setLayoutProperty(
+                    layerId,
+                    "visibility",
+                    visible
+                    ? "visible"
+                    : "none"
+                );
+
+                if(legendId){
+
+                    document
+                        .getElementById(legendId)
+                        .style.display =
+                        visible
+                        ? "block"
+                        : "none";
+
+                }
+
+            }
+        );
+
+}
+
+
+setupRasterToggle(
+    "lulcToggle",
+    "lulc",
+    "lulcLegend"
+);
+
+setupRasterToggle(
+    "ghiToggle",
+    "ghi",
+    "ghiLegend"
+);
+
+setupRasterToggle(
+    "slopeToggle",
+    "slope",
+    "slopeLegend"
+);
+
+setupRasterToggle(
+    "mpzToggle",
+    "mpz",
+    "mpzLegend"
+);
+
+
+/* ==========================================================
+   MARTIN CONTROLS
+   ========================================================== */
+
+const martinControls = [
+
+    [
+        "solarTheoretical",
+        "solar_theoretical"
+    ],
+
+    [
+        "solarTechnical",
+        "solar_technical"
+    ],
+
+    [
+        "solarMPZ2",
+        "solar_high_mpz2"
+    ],
+
+    [
+        "solarMPZ4",
+        "solar_high_mpz4"
+    ],
+
+    [
+        "waterTheoretical",
+        "water_theoretical"
+    ],
+
+    [
+        "waterTechnical",
+        "water_technical"
+    ],
+
+    [
+        "waterMPZ2",
+        "water_high_mpz2"
+    ],
+
+    [
+        "waterMPZ4",
+        "water_high_mpz4"
+    ],
+
+    [
+        "bgnTechnical",
+        "bgn_technical"
+    ],
+
+    [
+        "bgnMPZ2",
+        "bgn_high_mpz2"
+    ],
+
+    [
+        "bgnMPZ4",
+        "bgn_high_mpz4"
+    ]
+
+];
+
+
+martinControls.forEach(
+    ([controlId,layerId])=>{
+
+        document
+            .getElementById(controlId)
+            .addEventListener(
+                "change",
+                event=>{
+
+                    setVectorVisibility(
+                        layerId,
+                        event.target.checked
+                    );
+
+                }
+            );
+
+    }
+);
+
+
+/* ==========================================================
+   PARCEL POPUP
+   ========================================================== */
+
+const parcelLayers = [
+
+    "solar_theoretical",
+    "solar_technical",
+    "solar_high_mpz2",
+    "solar_high_mpz4",
+
+    "water_theoretical",
+    "water_technical",
+    "water_high_mpz2",
+    "water_high_mpz4",
+
+    "bgn_technical",
+    "bgn_high_mpz2",
+    "bgn_high_mpz4"
+
+];
+
+
+function getVisibleParcelLayers(){
+
+    const visibleLayers = [];
+
+    parcelLayers.forEach(
+        id=>{
+
+            const fillLayer =
+                id +
+                "-fill";
+
+            if(
+                map.getLayer(fillLayer) &&
+                map.getLayoutProperty(
+                    fillLayer,
+                    "visibility"
+                ) !== "none"
+            ){
+
+                visibleLayers.push(
+                    fillLayer
+                );
+
+            }
+
+        }
+    );
+
+    return visibleLayers;
+
+}
+
+
+map.on(
+    "click",
+    function(e){
+
+        const visibleLayers =
+            getVisibleParcelLayers();
+
+        if(
+            visibleLayers.length === 0
+        ){
+            return;
+        }
+
+        const features =
+            map.queryRenderedFeatures(
+                e.point,
+                {
+                    layers:
+                        visibleLayers
+                }
+            );
+
+        if(
+            !features.length
+        ){
+            return;
+        }
+
+        const feature =
+            features[0];
+
+        const properties =
+            feature.properties || {};
+
+        const layerName =
+            feature.sourceLayer ||
+            "Parcel";
+
+        let html = `
+
+            <div style="
+                min-width:230px;
+                max-width:320px;
+                font-family:Arial,sans-serif;
+            ">
+
+                <div style="
+                    font-weight:bold;
+                    font-size:14px;
+                    margin-bottom:9px;
+                    border-bottom:1px solid #ddd;
+                    padding-bottom:6px;
+                ">
+                    ${layerName}
+                </div>
+
+        `;
+
+
+        if(
+            properties.area_km2 !== undefined &&
+            properties.area_km2 !== null
+        ){
+
+            html += `
+
+                <div style="margin:5px 0;">
+
+                    <b>Area:</b>
+
+                    ${
+                        Number(
+                            properties.area_km2
+                        ).toFixed(3)
+                    }
+
+                    km²
+
+                </div>
+
+            `;
+
+        }
+
+
+        if(
+            properties.area_ha !== undefined &&
+            properties.area_ha !== null
+        ){
+
+            html += `
+
+                <div style="margin:5px 0;">
+
+                    <b>Area:</b>
+
+                    ${
+                        Number(
+                            properties.area_ha
+                        ).toFixed(2)
+                    }
+
+                    ha
+
+                </div>
+
+            `;
+
+        }
+
+
+        if(
+            properties.class_name !== undefined &&
+            properties.class_name !== null
+        ){
+
+            html += `
+
+                <div style="margin:5px 0;">
+
+                    <b>Class:</b>
+
+                    ${properties.class_name}
+
+                </div>
+
+            `;
+
+        }
+
+
+        if(
+            properties.class_id !== undefined &&
+            properties.class_id !== null
+        ){
+
+            html += `
+
+                <div style="margin:5px 0;">
+
+                    <b>Class ID:</b>
+
+                    ${properties.class_id}
+
+                </div>
+
+            `;
+
+        }
+
+
+        if(
+            properties.mean_ghi !== undefined &&
+            properties.mean_ghi !== null
+        ){
+
+            html += `
+
+                <div style="margin:5px 0;">
+
+                    <b>Mean GHI:</b>
+
+                    ${
+                        Number(
+                            properties.mean_ghi
+                        ).toFixed(2)
+                    }
+
+                </div>
+
+            `;
+
+        }
+
+
+        const distanceFields = [
+
+            [
+                "min_dist_road",
+                "Road"
+            ],
+
+            [
+                "min_dist_highway",
+                "Highway"
+            ],
+
+            [
+                "min_dist_powerline",
+                "Powerline"
+            ],
+
+            [
+                "min_dist_protected",
+                "Protected area"
+            ],
+
+            [
+                "min_dist_railway",
+                "Railway"
+            ],
+
+            [
+                "min_dist_substation",
+                "Substation"
+            ],
+
+            [
+                "min_dist_airport",
+                "Airport"
+            ],
+
+            [
+                "min_dist_waterbody",
+                "Waterbody"
+            ]
+
+        ];
+
+
+        distanceFields.forEach(
+            ([field,label])=>{
+
+                if(
+                    properties[field] !== undefined &&
+                    properties[field] !== null
+                ){
+
+                    html += `
+
+                        <div style="margin:5px 0;">
+
+                            <b>${label}:</b>
+
+                            ${
+                                Number(
+                                    properties[field]
+                                ).toFixed(0)
+                            }
+
+                            m
+
+                        </div>
+
+                    `;
+
+                }
+
+            }
+        );
+
+
+        html += `</div>`;
+
+
+        new maplibregl.Popup({
+            closeButton:true,
+            closeOnClick:true,
+            maxWidth:"340px"
+        })
+        .setLngLat(e.lngLat)
+        .setHTML(html)
+        .addTo(map);
+
+    }
+);
+
+
+/* ==========================================================
+   INFRASTRUCTURE
+   ========================================================== */
+
+const infrastructure = {
+
+    roads:{
+        url:
+            "/data/roads/roads_web.geojson",
+        type:"line",
+        color:"#555555",
+        width:1.5
+    },
+
+    railway:{
+        url:
+            "/data/railway/railway_web.geojson",
+        type:"line",
+        color:"#8b0000",
+        width:2
+    },
+
+    airport:{
+        url:
+            "/data/airport/airport_web.geojson",
+        type:"circle",
+        color:"#000000",
+        radius:5
+    },
+
+    powerline:{
+        url:
+            "/data/powerline/powerline_web.geojson",
+        type:"line",
+        color:"#ff00ff",
+        width:1.5
+    },
+
+    substations:{
+        url:
+            "/data/substations/substations_web.geojson",
+        type:"fill",
+        color:"#ff6600",
+        opacity:0.85
+    },
+
+    protected:{
+        url:
+            "/data/protected/protected_web.geojson",
+        type:"fill",
+        color:"#008000",
+        opacity:0.25
+    }
+
+};
+
+
+const loadedInfrastructure = {};
+
+
+/* ==========================================================
+   LOAD INFRASTRUCTURE
+   ========================================================== */
+
+function loadInfrastructure(id){
+
+    if(
+        loadedInfrastructure[id]
+    ){
+
+        setGeoJSONVisibility(
+            id,
+            true
+        );
+
+        return;
+
+    }
+
+
+    const cfg =
+        infrastructure[id];
+
+
+    if(!cfg){
+        return;
+    }
+
+
+    map.addSource(
+        id,
+        {
+            type:"geojson",
+
+            data:
+                SERVER +
+                cfg.url
+        }
+    );
+
+
+    if(
+        cfg.type === "line"
+    ){
+
+        map.addLayer({
+
+            id:
+                id +
+                "-layer",
+
+            type:"line",
+
+            source:id,
+
+            paint:{
+
+                "line-color":
+                    cfg.color,
+
+                "line-width":
+                    cfg.width
+
+            }
+
+        });
+
+    }
+
+
+    else if(
+        cfg.type === "circle"
+    ){
+
+        map.addLayer({
+
+            id:
+                id +
+                "-layer",
+
+            type:"circle",
+
+            source:id,
+
+            paint:{
+
+                "circle-color":
+                    cfg.color,
+
+                "circle-radius":
+                    cfg.radius,
+
+                "circle-stroke-color":
+                    "#ffffff",
+
+                "circle-stroke-width":
+                    1
+
+            }
+
+        });
+
+    }
+
+
+    else if(
+        cfg.type === "fill"
+    ){
+
+        map.addLayer({
+
+            id:
+                id +
+                "-layer",
+
+            type:"fill",
+
+            source:id,
+
+            paint:{
+
+                "fill-color":
+                    cfg.color,
+
+                "fill-opacity":
+                    cfg.opacity,
+
+                "fill-antialias":
+                    true
+
+            }
+
+        });
+
+
+        map.addLayer({
+
+            id:
+                id +
+                "-outline",
+
+            type:"line",
+
+            source:id,
+
+            paint:{
+
+                "line-color":
+
+                    id === "substations"
+                    ? "#ff3300"
+                    : cfg.color,
+
+                "line-width":
+
+                    id === "substations"
+                    ? 3
+                    : 2,
+
+                "line-opacity":1
+
+            }
+
+        });
+
+    }
+
+
+    loadedInfrastructure[id] =
+        true;
+
+
+    /* ======================================================
+       SUBSTATION POPUP
+       ====================================================== */
+
+    if(
+        id === "substations"
+    ){
+
+        map.on(
+            "click",
+            id + "-layer",
+            function(e){
+
+                if(
+                    !e.features ||
+                    !e.features.length
+                ){
+                    return;
+                }
+
+
+                const p =
+                    e.features[0]
+                    .properties || {};
+
+
+                let html = `
+
+                    <div style="
+                        min-width:220px;
+                        font-family:Arial,sans-serif;
+                    ">
+
+                        <div style="
+                            font-weight:bold;
+                            font-size:14px;
+                            margin-bottom:9px;
+                            border-bottom:1px solid #ddd;
+                            padding-bottom:6px;
+                        ">
+                            Substation
+                        </div>
+
+                `;
+
+
+                if(p.power){
+
+                    html += `
+
+                        <div style="margin:5px 0;">
+
+                            <b>Power:</b>
+
+                            ${p.power}
+
+                        </div>
+
+                    `;
+
+                }
+
+
+                if(p.name){
+
+                    html += `
+
+                        <div style="margin:5px 0;">
+
+                            <b>Name:</b>
+
+                            ${p.name}
+
+                        </div>
+
+                    `;
+
+                }
+
+
+                if(p.name_en){
+
+                    html += `
+
+                        <div style="margin:5px 0;">
+
+                            <b>Name (English):</b>
+
+                            ${p.name_en}
+
+                        </div>
+
+                    `;
+
+                }
+
+
+                if(p.voltage){
+
+                    html += `
+
+                        <div style="margin:5px 0;">
+
+                            <b>Voltage:</b>
+
+                            ${p.voltage}
+
+                        </div>
+
+                    `;
+
+                }
+
+
+                if(p.substation){
+
+                    html += `
+
+                        <div style="margin:5px 0;">
+
+                            <b>Substation:</b>
+
+                            ${p.substation}
+
+                        </div>
+
+                    `;
+
+                }
+
+
+                html += `</div>`;
+
+
+                new maplibregl.Popup({
+                    closeButton:true,
+                    closeOnClick:true,
+                    maxWidth:"300px"
+                })
+                .setLngLat(e.lngLat)
+                .setHTML(html)
+                .addTo(map);
+
+            }
+        );
+
+
+        map.on(
+            "mouseenter",
+            id + "-layer",
+            function(){
+                map.getCanvas().style.cursor =
+                    "pointer";
+            }
+        );
+
+
+        map.on(
+            "mouseleave",
+            id + "-layer",
+            function(){
+                map.getCanvas().style.cursor =
+                    "";
+            }
+        );
+
+    }
+
+}
+
+
+/* ==========================================================
+   GEOJSON VISIBILITY
+   ========================================================== */
+
+function setGeoJSONVisibility(
+    id,
+    visible
+){
+
+    const visibility =
+        visible
+        ? "visible"
+        : "none";
+
+
+    if(
+        map.getLayer(
+            id +
+            "-layer"
+        )
+    ){
+
+        map.setLayoutProperty(
+            id +
+            "-layer",
+            "visibility",
+            visibility
+        );
+
+    }
+
+
+    if(
+        map.getLayer(
+            id +
+            "-outline"
+        )
+    ){
+
+        map.setLayoutProperty(
+            id +
+            "-outline",
+            "visibility",
+            visibility
+        );
+
+    }
+
+}
+
+
+/* ==========================================================
+   INFRASTRUCTURE CONTROLS
+   ========================================================== */
+
+const infrastructureControls = [
+
+    [
+        "roadsToggle",
+        "roads"
+    ],
+
+    [
+        "railwayToggle",
+        "railway"
+    ],
+
+    [
+        "airportToggle",
+        "airport"
+    ],
+
+    [
+        "powerlineToggle",
+        "powerline"
+    ],
+
+    [
+        "substationsToggle",
+        "substations"
+    ],
+
+    [
+        "protectedToggle",
+        "protected"
+    ]
+
+];
+
+
+infrastructureControls.forEach(
+    ([controlId,layerId])=>{
+
+        document
+            .getElementById(controlId)
+            .addEventListener(
+                "change",
+                event=>{
+
+                    if(
+                        event.target.checked
+                    ){
+
+                        loadInfrastructure(
+                            layerId
+                        );
+
+                    }
+                    else{
+
+                        setGeoJSONVisibility(
+                            layerId,
+                            false
+                        );
+
+                    }
+
+                }
+            );
+
+    }
+);
+
+
+/* ==========================================================
+   BASEMAP SWITCH
+   ========================================================== */
+
+document
+    .getElementById("osmBtn")
+    .addEventListener(
+        "click",
+        ()=>{
+
+            map.setLayoutProperty(
+                "osm",
+                "visibility",
+                "visible"
+            );
+
+            map.setLayoutProperty(
+                "satellite",
+                "visibility",
+                "none"
+            );
+
+            document
+                .getElementById("osmBtn")
+                .classList
+                .add("active");
+
+            document
+                .getElementById("satelliteBtn")
+                .classList
+                .remove("active");
+
+        }
+    );
+
+
+document
+    .getElementById("satelliteBtn")
+    .addEventListener(
+        "click",
+        ()=>{
+
+            map.setLayoutProperty(
+                "osm",
+                "visibility",
+                "none"
+            );
+
+            map.setLayoutProperty(
+                "satellite",
+                "visibility",
+                "visible"
+            );
+
+            document
+                .getElementById("satelliteBtn")
+                .classList
+                .add("active");
+
+            document
+                .getElementById("osmBtn")
+                .classList
+                .remove("active");
+
+        }
+    );
+
+</script>
+
+</body>
+</html>

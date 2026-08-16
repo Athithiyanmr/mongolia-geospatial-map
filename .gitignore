@@ -1,0 +1,8 @@
+tiles/
+vector/
+.DS_Store
+._*
+index_aoi_lulc_backup.html
+index_before_final.html
+index_lulc_ghi_backup.html
+index_raster_backup.html
